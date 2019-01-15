@@ -17,11 +17,13 @@ function hash(str) {
 }
 
 function make_a_block(data, pre_hash, index) {
-    var hash_text = hash(data + pre_hash);
+    var timetamp = Date.now();
+    var hash_text = hash(data + pre_hash + timetamp);
     var block = {
         pre_hash: pre_hash,
         index: index,
         data: data,
+        timetamp: timetamp,
         hash: hash_text
     };
     return block;
@@ -29,14 +31,9 @@ function make_a_block(data, pre_hash, index) {
 
 //创世
 function g() {
+    var pre_hash = "";
     var data = "Genesis";
-    var hash_text = hash(data + "0");
-    blockchain.push({
-        pre_hash: "0",
-        index: 0,
-        data: data,
-        hash: hash_text
-    });
+    blockchain.push(make_a_block(data, pre_hash, 0));
 }
 
 function add_a_block_to_blockchain(data) {
@@ -49,8 +46,6 @@ function add_a_block_to_blockchain(data) {
 function get_all_blocks() {
     return blockchain;
 }
-
-g();
 
 
 var sockets = [];//节点连接库
@@ -68,12 +63,19 @@ var initHttpServer = () => {//控制节点的HTTP服务器  类似节点操作
         res.send([req.body.peer]);
     });
 
+    app.get('/g', (req, res) => {
+        g();
+        broadcast(blockchain[0]);//广播
+        res.json(blockchain);
+    });
+
     app.get('/blocks/all', (req, res) => {
         res.json(blockchain);
     });
 
     app.post('/block', (req, res) => {//
         var data = req.body.data;
+        console.log(data);
         var block = add_a_block_to_blockchain(data);
         broadcast(block);//广播
         res.send();
@@ -93,15 +95,19 @@ var initConnection = (ws) => {//初始化连接
     sockets.push(ws);//压入已连接的节点堆栈
     initMessageHandler(ws);//信息处理
     initErrorHandler(ws);//错误状态处理
-    write(ws, blockchain[blockchain.length-1]);//广播
+    write(ws, blockchain[blockchain.length - 1]);//广播
     console.log('new peer:' + ws._socket.remoteAddress + ':' + ws._socket.remotePort)
 };
 
 var initMessageHandler = (ws) => {//同步信息处理
     ws.on('message', (data) => {
-        var message = JSON.parse(data);
-        console.log('Received message' + JSON.stringify(message));
-        handleBlock(message);//写入blockchain
+
+        if (data) {
+            console.log("data:", data);
+            var block = JSON.parse(data);
+            handleBlock(block);//写入blockchain
+        }
+
     });
 };
 
@@ -114,9 +120,25 @@ var initErrorHandler = (ws) => {//错误信息处理
     ws.on('error', () => closeConnection(ws));
 };
 
-var handleBlock = (message) => {//同步区块链信息
-    blockchain.push(message);
-    broadcast(message);//向临近节点广播
+var handleBlock = (block) => {//同步区块链信息
+    console.log("sync:", block);
+
+    if (blockchain.length == 0) {
+        //同步的是创世
+        blockchain.push(block);
+        broadcast(block);//向临近节点广播
+    } else {
+        //其他区块
+        //是新的区块
+        if (block.index > blockchain.length - 1) {
+            //hash 和 pre hash 能对上
+            if (block.pre_hash == blockchain[blockchain.length - 1].hash) {
+                blockchain.push(block);
+                broadcast(block);//向临近节点广播
+            }
+            //
+        }
+    }
 };
 
 var connectToPeers = (newPeers) => {//连接新节点  客户端
@@ -130,8 +152,8 @@ var connectToPeers = (newPeers) => {//连接新节点  客户端
 };
 
 
-var write = (ws, message) => ws.send(JSON.stringify(message));
-var broadcast = (message) => sockets.forEach(socket => write(socket, message));
+var write = (ws, block) => ws.send(JSON.stringify(block));
+var broadcast = (block) => sockets.forEach(socket => write(socket, block));
 
 
 initHttpServer();
