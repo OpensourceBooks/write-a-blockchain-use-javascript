@@ -72,6 +72,41 @@ curl http://localhost:3003/blocks/all
 ```
 
 
+### 用户操作
+
+新建用户
+
+```
+node newuser.js
+```
+
+```
+ 你要把助忆词和地址抄在安全的地方，key文件里仅仅保存私钥。 
+
++--------------+---------------------------------------------------------------------------------------+
+|  mnemonic    | analyst merit gown expect lake crouch either radio achieve provide half total         |
+|  Privatekey  | 5JdGzR28pdh6c3vKrwLuQvWXbznJmrPwE81qurSVZzf8SwCtsDY                                   |
+|  Publickey   | GPH6HqQmNUBb3AqTfW7MtBqVCPXDJuKnZVEeyxPNk64sE6QYQKyH5                                 |
+|  Address     | GPH9Jw8v7vmqKTaMjJpac2xefehQ7d9nJkAm                                                  |
++------------  +---------------------------------------------------------------------------------------+
+
+```
+显示用户
+
+```
+node showuser.js
+```
+
+```
+这是你的信息 
+
++--------------+---------------------------------------------------------------------------------------+
+|  Privatekey  | 5JdGzR28pdh6c3vKrwLuQvWXbznJmrPwE81qurSVZzf8SwCtsDY                                   |
+|  Publickey   | GPH6HqQmNUBb3AqTfW7MtBqVCPXDJuKnZVEeyxPNk64sE6QYQKyH5                                 |
+|  Address     | GPH9Jw8v7vmqKTaMjJpac2xefehQ7d9nJkAm                                                  |
++------------  +---------------------------------------------------------------------------------------+
+```
+
 
 ### 交流
 
