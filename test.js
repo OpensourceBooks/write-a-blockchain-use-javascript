@@ -5,9 +5,9 @@ var fs = require('fs');
 var request = require('request');
 var FormData = require('form-data');
 
-var text = process.argv[2];//上链的内容
-var node_host = process.argv[3];//节点ip
-var node_port = process.argv[4];//节点port
+var text = "test"
+var node_host = "localhost";
+var node_port = 3001;
 
 fs.readFile('./key', 'utf-8', function (err, data) {
     if (err) {
@@ -19,31 +19,13 @@ fs.readFile('./key', 'utf-8', function (err, data) {
     let address = Address.fromPublic(publicKey);
     var signed = Signature.signBuffer(text, privateKey);
     var signedHex = signed.toHex();
-    // var timetamp = Date.now();
-    // console.log("timetamp:", timetamp);
 
-    // console.log("text:", text);
-    // console.log("address:", address.toString());
-    // console.log("publicKey:", publicKey.toString());
-    // console.log("signed:", signedHex);
-
-    if (!text) {
-        text = "hello";
-    }
-
-    //var form = new FormData();
-
-    //form.append("text", text);
-
-    // form.submit('http://example.org/', function (err, res) {
-    //     res.resume();
-    // });
 
     var requestData = {
         text: text,
         address: address.toString(),
         publicKey: publicKey.toString(),
-        signedHex: signedHex
+        signedHex: "1f5e1322e687bcb3b72f677e2bb12c2cb65bab43add250b955a96bd5d63189cc1546ca7109d96aff71b63a90f20e727a0c601dedd8b7b736da21d0d1a9cf717ba5"
     }
 
     httprequest(requestData);
@@ -64,7 +46,7 @@ function httprequest(requestData) {
         if (!error && response.statusCode == 200) {
             console.log(body);
         } else {
-            console.log(error);
+            console.log(body);
         }
     });
 };

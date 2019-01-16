@@ -1,4 +1,4 @@
-var { PrivateKey, key, Address, Signature } = require("bitsharesjs");
+var { PrivateKey, Address } = require("bitsharesjs");
 var seedrandom = require('seedrandom');
 var bip39 = require("bip39");
 var fs = require('fs');

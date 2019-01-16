@@ -5,6 +5,7 @@ var bodyParser = require('body-parser');
 var http_port = process.env.HTTP_PORT || 3001;//环境变量 HTTP服务器
 var p2p_port = process.env.P2P_PORT || 6001;//环境变量 P2P服务器
 var crypto = require("crypto");
+var { PublicKey, Signature } = require("bitsharesjs");
 
 var num = 0;
 var blockchain = [];//blockchain
@@ -47,6 +48,12 @@ function get_all_blocks() {
     return blockchain;
 }
 
+function verify_text(text, signedHex, publicKey) {
+    //检测内容是不是具有签名的人签名的
+    var signed2 = Signature.fromHex(signedHex);
+    var publicKey = PublicKey.fromPublicKeyString(publicKey);
+    return signed2.verifyBuffer(text, publicKey);
+}
 
 var sockets = [];//节点连接库
 
@@ -74,11 +81,28 @@ var initHttpServer = () => {//控制节点的HTTP服务器  类似节点操作
     });
 
     app.post('/block', (req, res) => {//
-        var data = req.body.data;
-        console.log(data);
-        var block = add_a_block_to_blockchain(data);
-        broadcast(block);//广播
-        res.send();
+        var text = req.body.text;
+        var address = req.body.address;
+        var publicKey = req.body.publicKey;
+        var signedHex = req.body.signedHex;
+
+        var data = {
+            text: text,
+            address: address,
+            publicKey: publicKey,
+            signedHex: signedHex
+        }
+
+        //检验
+        if (verify_text(text, signedHex, publicKey)) {
+            var block = add_a_block_to_blockchain(data);
+            broadcast(block);//广播
+            res.send("ok");
+        } else {
+            res.send("error with verify text");
+        }
+        //
+
     });
 
     app.listen(http_port, () => console.log('Listening http on port: ' + http_port));//监听端口
