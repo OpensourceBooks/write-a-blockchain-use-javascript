@@ -50,13 +50,6 @@ curl http://localhost:3001/peers
 curl http://localhost:3001/g
 ```
 
-### 增加区块
-
-```
-curl -H "Content-type:application/json" --data '{"data":"haha"}' http://localhost:3001/block
-
-```
-
 ### 查询区块
 
 ```
