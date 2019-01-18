@@ -6,9 +6,10 @@ var http_port = process.env.HTTP_PORT || 3001;//环境变量 HTTP服务器
 var p2p_port = process.env.P2P_PORT || 6001;//环境变量 P2P服务器
 var crypto = require("crypto");
 var { PublicKey, Signature } = require("bitsharesjs");
+var nStore = require('nstore');
+nStore = nStore.extend(require('nstore/query')());
 
-var num = 0;
-var blockchain = [];//blockchain
+//var blockchain = [];//blockchain
 
 function hash(str) {
     return crypto
@@ -34,18 +35,51 @@ function make_a_block(data, pre_hash, index) {
 function g() {
     var pre_hash = "";
     var data = "Genesis";
-    blockchain.push(make_a_block(data, pre_hash, 0));
+    var block_g = make_a_block(data, pre_hash, 0);
+
+    block_db.save("block_0", block_g, function (err) {
+        if (err) { throw err; }
+        // The save is finished and written to disk safely
+    });
+    block_db.save("index", 0, function (err) {
+        if (err) { throw err; }
+        // The save is finished and written to disk safely
+
+    });
+    broadcast(block_g);//广播
+    //blockchain.push(make_a_block(data, pre_hash, 0));
 }
 
 function add_a_block_to_blockchain(data) {
-    var pre_hash = blockchain[blockchain.length - 1].hash;
-    var block = make_a_block(data, pre_hash, blockchain.length)
-    blockchain.push(block);
-    return block;
+    block_db.get("index", function (err, doc, key) {
+        var index = 0;
+        if (err) {
+            //throw err; 
+        } else {
+            index = parseInt(doc);
+        }
+        block_db.get("block_" + index, function (err, doc, key) {
+            if (err) { throw err; }
+            var last_block = doc;
+            var pre_hash = last_block.hash;
+            var block = make_a_block(data, pre_hash, last_block.index + 1)
+            //blockchain.push(block);
+            broadcast(block);//广播
+            block_db.save("block_" + block.index, block, function (err) {
+                if (err) { throw err; }
+                // The save is finished and written to disk safely
+                block_db.save("index", block.index, function (err) {
+                    if (err) { throw err; }
+                    // The save is finished and written to disk safely
+                });
+            });
+        });
+    });
+
 }
 
 function get_all_blocks() {
-    return blockchain;
+    //return blockchain;
 }
 
 function verify_text(text, signedHex, publicKey) {
@@ -72,12 +106,14 @@ var initHttpServer = () => {//控制节点的HTTP服务器  类似节点操作
 
     app.get('/g', (req, res) => {
         g();
-        broadcast(blockchain[0]);//广播
-        res.json(blockchain);
+
+        res.send("ok");
     });
 
     app.get('/blocks/all', (req, res) => {
-        res.json(blockchain);
+        block_db.all(function (err, results) {
+            res.json(results);
+        });
     });
 
     app.post('/block', (req, res) => {//
@@ -95,8 +131,8 @@ var initHttpServer = () => {//控制节点的HTTP服务器  类似节点操作
 
         //检验
         if (verify_text(text, signedHex, publicKey)) {
-            var block = add_a_block_to_blockchain(data);
-            broadcast(block);//广播
+            add_a_block_to_blockchain(data);
+
             res.send("ok");
         } else {
             res.send("error with verify text");
@@ -119,7 +155,8 @@ var initConnection = (ws) => {//初始化连接
     sockets.push(ws);//压入已连接的节点堆栈
     initMessageHandler(ws);//信息处理
     initErrorHandler(ws);//错误状态处理
-    write(ws, blockchain[blockchain.length - 1]);//广播
+    //write(ws, blockchain[blockchain.length - 1]);//广播
+    //write(ws, null);//广播
     console.log('new peer:' + ws._socket.remoteAddress + ':' + ws._socket.remotePort)
 };
 
@@ -127,7 +164,7 @@ var initMessageHandler = (ws) => {//同步信息处理
     ws.on('message', (data) => {
 
         if (data) {
-            console.log("data:", data);
+
             var block = JSON.parse(data);
             handleBlock(block);//写入blockchain
         }
@@ -145,24 +182,68 @@ var initErrorHandler = (ws) => {//错误信息处理
 };
 
 var handleBlock = (block) => {//同步区块链信息
+
     console.log("sync:", block);
 
-    if (blockchain.length == 0) {
-        //同步的是创世
-        blockchain.push(block);
-        broadcast(block);//向临近节点广播
-    } else {
-        //其他区块
-        //是新的区块
-        if (block.index > blockchain.length - 1) {
-            //hash 和 pre hash 能对上
-            if (block.pre_hash == blockchain[blockchain.length - 1].hash) {
-                blockchain.push(block);
+
+
+    block_db.get("index", function (err, doc, key) {
+        var index = 0;
+        if (err) {
+            //throw err; 
+            //说明之前没有，那么就把创世区块存进来。
+
+            if (block.index == 0) {
+                //如果同步的是创世区块
+                block_db.save("block_0", block, function (err) {
+                    if (err) { throw err; }
+                    // The save is finished and written to disk safely
+                });
+                block_db.save("index", 0, function (err) {
+                    if (err) { throw err; }
+                    // The save is finished and written to disk safely
+
+                });
                 broadcast(block);//向临近节点广播
             }
-            //
+
+
+        } else {
+            index = parseInt(doc);
+            //是新的区块
+            if (block.index > index) {
+                //hash 和 pre hash 能对上
+
+                block_db.get("block_" + index, function (err, doc, key) {
+                    if (err) {
+                        throw err;
+                    }
+                    var last_block = doc;
+                    console.log("last_block", last_block);
+                    if (block.pre_hash == last_block.hash) {
+                        block_db.save("block_" + block.index, block, function (err) {
+                            if (err) { throw err; }
+                            // The save is finished and written to disk safely
+                        });
+                        block_db.save("index", block.index, function (err) {
+                            if (err) { throw err; }
+                            // The save is finished and written to disk safely
+
+                        });
+                        broadcast(block);//向临近节点广播
+                    }
+                });
+
+
+                //
+            }
+
         }
-    }
+
+    });
+
+
+
 };
 
 var connectToPeers = (newPeers) => {//连接新节点  客户端
@@ -180,5 +261,11 @@ var write = (ws, block) => ws.send(JSON.stringify(block));
 var broadcast = (block) => sockets.forEach(socket => write(socket, block));
 
 
-initHttpServer();
-initP2PServer();
+
+
+
+var block_db = nStore.new("block" + http_port + ".db", function () {
+    // It's loaded now
+    initHttpServer();
+    initP2PServer();
+});

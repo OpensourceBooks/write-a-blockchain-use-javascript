@@ -12,6 +12,7 @@
     "crypto-js": "^3.1.6",
     "express": "~4.11.1",
     "form-data": "^2.3.3",
+    "nstore": "^0.5.2",
     "ws": "^1.1.0"
   },
   "engines": {
