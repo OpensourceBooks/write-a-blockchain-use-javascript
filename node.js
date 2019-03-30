@@ -4,23 +4,16 @@ var WebSocket = require("ws");
 var bodyParser = require('body-parser');
 var http_port = process.env.HTTP_PORT || 3001;//环境变量 HTTP服务器
 var p2p_port = process.env.P2P_PORT || 6001;//环境变量 P2P服务器
-var crypto = require("crypto");
+var crypto = require("./lib/crypto");
 var { PublicKey, Signature } = require("bitsharesjs");
 var nStore = require('nstore');
 nStore = nStore.extend(require('nstore/query')());
 
 //var blockchain = [];//blockchain
 
-function hash(str) {
-    return crypto
-        .createHash("md5")
-        .update(str)
-        .digest("hex");
-}
-
 function make_a_block(data, pre_hash, index) {
     var timetamp = Date.now();
-    var hash_text = hash(data + pre_hash + timetamp);
+    var hash_text = crypto.hash(data + pre_hash + timetamp);
     var block = {
         pre_hash: pre_hash,
         index: index,
@@ -50,7 +43,7 @@ function g() {
     //blockchain.push(make_a_block(data, pre_hash, 0));
 }
 
-function add_a_block_to_blockchain(data) {
+function add_a_block_to_blockchain(data,res) {
     block_db.get("index", function (err, doc, key) {
         var index = 0;
         if (err) {
@@ -71,6 +64,12 @@ function add_a_block_to_blockchain(data) {
                 block_db.save("index", block.index, function (err) {
                     if (err) { throw err; }
                     // The save is finished and written to disk safely
+                    res.json({
+                        texthash:data.texthash,
+                        deskey:data.deskey,
+                        index:block.index,
+                        blockhash:block.hash
+                    });
                 });
             });
         });
@@ -122,18 +121,23 @@ var initHttpServer = () => {//控制节点的HTTP服务器  类似节点操作
         var publicKey = req.body.publicKey;
         var signedHex = req.body.signedHex;
 
-        var data = {
-            text: text,
-            address: address,
-            publicKey: publicKey,
-            signedHex: signedHex
-        }
-
+        
         //检验
         if (verify_text(text, signedHex, publicKey)) {
-            add_a_block_to_blockchain(data);
+            const des = crypto.encrypt(text);
+            const texthash = crypto.hash(text);
+            var data = {
+                destext:des.value,
+                deskey:des.key,
+                texthash: texthash,
+                address: address,
+                publicKey: publicKey,
+                signedHex: signedHex
+            }
+    
+            add_a_block_to_blockchain(data,res);
 
-            res.send("ok");
+            
         } else {
             res.send("error with verify text");
         }
